@@ -109,7 +109,7 @@ func (s *Service) Connect(server api.Connection_ConnectServer) error {
 				log.WithValues("device", deviceName),
 				deviceName,
 				dataHandler,
-				parameters,
+				parameters.SyncInterval,
 				gatt,
 			)
 		}

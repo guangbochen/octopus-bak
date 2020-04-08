@@ -207,9 +207,12 @@ spec:
       containers:
       - image: rancher/octopus-adaptor-ble:latest
         name: octopus
+        securityContext:
+          privileged: true
         volumeMounts:
         - mountPath: /var/lib/octopus/adaptors/
           name: sockets
+      hostNetwork: true
       nodeSelector:
         beta.kubernetes.io/os: linux
       volumes:

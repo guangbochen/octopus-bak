@@ -32,14 +32,13 @@ type device struct {
 	status       v1alpha1.BluetoothDeviceStatus
 }
 
-func NewDevice(log logr.Logger, name types.NamespacedName, handler DataHandler, param Parameters,
+func NewDevice(log logr.Logger, name types.NamespacedName, handler DataHandler, syncInterval time.Duration,
 	gattDevice gatt.Device) Device {
 	return &device{
 		log:          log,
 		name:         name,
 		handler:      handler,
-		syncInterval: param.SyncInterval,
-		timeout:      param.Timeout,
+		syncInterval: syncInterval,
 		gattDevice:   gattDevice,
 	}
 }
@@ -75,10 +74,10 @@ func (d *device) connect(spec v1alpha1.BluetoothDeviceSpec, status v1alpha1.Blue
 
 		d.gattDevice.Init(onStateChanged)
 		logrus.Info("Device Done")
-
-		d.handler(d.name, cont.status)
-		logrus.Infof("Synced ble device status: %+v", cont.status)
 		<-cont.done
+
+		go d.handler(d.name, cont.status)
+		logrus.Infof("Synced ble device status: %+v", cont.status)
 
 		select {
 		case <-d.stop:
@@ -89,8 +88,14 @@ func (d *device) connect(spec v1alpha1.BluetoothDeviceSpec, status v1alpha1.Blue
 }
 
 func (d *device) Shutdown() {
+	d.Lock()
+	defer d.Unlock()
+
 	if d.stop != nil {
 		close(d.stop)
 	}
-	d.log.Info("closed connection")
+	if err := d.gattDevice.Stop(); err != nil {
+		d.log.Error(err, "Error closing gatt device")
+	}
+	d.log.Info("Closed connection")
 }

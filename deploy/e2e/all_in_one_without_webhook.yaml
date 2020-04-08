@@ -350,7 +350,7 @@ spec:
         - brain
         - --enable-leader-election
         - --disable-admission-webhook
-        image: rancher/octopus:latest
+        image: guangbo/octopus:latest
         name: octopus
       nodeSelector:
         beta.kubernetes.io/os: linux
@@ -386,7 +386,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
-        image: rancher/octopus:latest
+        image: guangbo/octopus:latest
         name: octopus
         volumeMounts:
         - mountPath: /var/lib/octopus/adaptors/
