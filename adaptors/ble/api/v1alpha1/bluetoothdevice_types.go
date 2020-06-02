@@ -7,8 +7,7 @@ import (
 // BluetoothDeviceSpec defines the desired state of BluetoothDevice
 type BluetoothDeviceSpec struct {
 	Properties []DeviceProperty `json:"properties,omitempty"`
-	Name       string           `json:"name,omitempty"`
-	MacAddress string           `json:"macAddress,omitempty"`
+	Protocol   DeviceProtocol   `json:"protocol,omitempty"`
 }
 
 // DeviceProperty defines an individual ble device property
@@ -17,6 +16,12 @@ type DeviceProperty struct {
 	Description string             `json:"description,omitempty"`
 	AccessMode  PropertyAccessMode `json:"accessMode,omitempty"`
 	Visitor     PropertyVisitor    `json:"visitor,omitempty"`
+}
+
+// DeviceProtocol defines how to connect the BLE device
+type DeviceProtocol struct {
+	Name       string `json:"name,omitempty"`
+	MacAddress string `json:"macAddress,omitempty"`
 }
 
 // The access mode for  a device property.

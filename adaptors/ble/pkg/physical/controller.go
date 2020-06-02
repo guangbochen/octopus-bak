@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/bettercap/gatt"
+	"github.com/go-logr/logr"
 	"github.com/rancher/octopus/adaptors/ble/api/v1alpha1"
-	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -15,13 +15,14 @@ type Controller struct {
 	spec   v1alpha1.BluetoothDeviceSpec
 	status v1alpha1.BluetoothDeviceStatus
 	done   chan struct{}
+	log    logr.Logger
 }
 
-func onStateChanged(d gatt.Device, s gatt.State) {
-	logrus.Printf("Bluetooth state: %s", s)
+func (c *Controller) onStateChanged(d gatt.Device, s gatt.State) {
+	c.log.Info("Bluetooth state", s)
 	switch s {
 	case gatt.StatePoweredOn:
-		logrus.Info("Scanning...")
+		c.log.Info("Scanning...")
 		d.Scan([]gatt.UUID{}, false)
 		return
 	default:
@@ -30,8 +31,8 @@ func onStateChanged(d gatt.Device, s gatt.State) {
 }
 
 func (c *Controller) onPeripheralDiscovered(p gatt.Peripheral, a *gatt.Advertisement, rssi int) {
-	name := c.spec.Name
-	addr := c.spec.MacAddress
+	name := c.spec.Protocol.Name
+	addr := c.spec.Protocol.MacAddress
 	if name != "" && a.LocalName != name {
 		return
 	}
@@ -41,24 +42,24 @@ func (c *Controller) onPeripheralDiscovered(p gatt.Peripheral, a *gatt.Advertise
 	}
 
 	// Stop scanning once we've got the peripheral we're looking for.
-	logrus.Info("Stop scanning and found device ", a.LocalName)
+	c.log.Info("Stop scanning and found device", a.LocalName)
 	p.Device().StopScanning()
-	logrus.Info("Peripheral ID, name ", p.ID(), p.Name())
+	c.log.Info("Peripheral ID, name", p.ID(), p.Name())
 	p.Device().Connect(p)
 }
 
 func (c *Controller) onPeripheralConnected(p gatt.Peripheral, err error) {
-	logrus.Printf("Connected to %s", p.Name())
+	c.log.Info("Connected to", p.Name())
 	defer p.Device().CancelConnection(p)
 
 	if err := p.SetMTU(500); err != nil {
-		logrus.Error(err, "Failed to set MTU")
+		c.log.Error(err, "Failed to set MTU")
 	}
 
 	// Discovery services
 	ss, err := p.DiscoverServices(nil)
 	if err != nil {
-		logrus.Error(err, "Failed to discover services")
+		c.log.Error(err, "Failed to discover services")
 		return
 	}
 
@@ -67,7 +68,7 @@ func (c *Controller) onPeripheralConnected(p gatt.Peripheral, err error) {
 		// Discovery characteristics
 		cs, err := p.DiscoverCharacteristics(nil, svc)
 		if err != nil {
-			logrus.Error(err, "Failed to discover characteristics")
+			c.log.Error(err, "Failed to discover characteristics")
 			continue
 		}
 
@@ -82,7 +83,7 @@ func (c *Controller) onPeripheralConnected(p gatt.Peripheral, err error) {
 				{
 					_, err := c.readCharacteristic(p, ch, property)
 					if err != nil {
-						logrus.Errorln(err)
+						c.log.Error(err, "Failed to read Characteristic")
 						continue
 					}
 				}
@@ -90,7 +91,7 @@ func (c *Controller) onPeripheralConnected(p gatt.Peripheral, err error) {
 				{
 					err := c.writeCharacteristic(p, ch, property)
 					if err != nil {
-						logrus.Errorln(err)
+						c.log.Error(err, "Failed to write Characteristic")
 						return
 					}
 				}
@@ -98,21 +99,21 @@ func (c *Controller) onPeripheralConnected(p gatt.Peripheral, err error) {
 				{
 					err := c.getNotifyCharacteristic(p, ch, property)
 					if err != nil {
-						logrus.Errorln(err)
+						c.log.Error(err, "Failed to get notify Characteristic")
 						return
 					}
 				}
 			default:
-				logrus.Errorf("AccessMode is not defined or either not a valid option, %s", property.AccessMode)
+				c.log.Info("AccessMode is not defined or either not a valid option", property.AccessMode)
 			}
 		}
 	}
-	logrus.Info("Waiting for 5 seconds to get some notifications, if any.")
+	c.log.Info("Waiting for 5 seconds to get some notifications, if any.")
 	time.Sleep(5 * time.Second)
 }
 
 func (c *Controller) onPeriphDisconnected(p gatt.Peripheral, err error) {
-	logrus.Info("Device disconnected")
+	c.log.Info("Device disconnected")
 	if c.done != nil {
 		close(c.done)
 	}
@@ -133,11 +134,10 @@ func (c *Controller) readCharacteristic(p gatt.Peripheral, ch *gatt.Characterist
 	if err != nil {
 		return "", err
 	}
-	logrus.Infof("ReadCharacteristic value %x | %q\n", b, b)
+	c.log.Info(fmt.Sprintf("ReadCharacteristic value %x | %q\n", b, b))
 
-	convertedValue := fmt.Sprintf("%f", ConvertReadData(property, b))
-	logrus.Infof("Converted read value to %s", convertedValue)
-
+	convertedValue := fmt.Sprintf("%f", ConvertReadData(property.Visitor.BluetoothDataConverter, b))
+	c.log.Info("Converted read value to", convertedValue)
 	c.updateDeviceStatus(property.Name, "", convertedValue)
 	return convertedValue, nil
 }
@@ -174,7 +174,7 @@ func (c *Controller) getNotifyCharacteristic(p gatt.Peripheral, ch *gatt.Charact
 	// Subscribe the characteristic, if possible.
 	if (ch.Properties() & (gatt.CharNotify | gatt.CharIndicate)) != 0 {
 		f := func(ch *gatt.Characteristic, b []byte, err error) {
-			logrus.Infof("notified: % X | %q\n", b, b)
+			c.log.Info(fmt.Sprintf("notified: % X | %q\n", b, b))
 			value := fmt.Sprintf("%q", b)
 			c.updateDeviceStatus(property.Name, "", value)
 		}

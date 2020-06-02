@@ -6,7 +6,6 @@ import (
 
 	"github.com/bettercap/gatt"
 	"github.com/go-logr/logr"
-	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/types"
 
 	"github.com/rancher/octopus/adaptors/ble/api/v1alpha1"
@@ -45,7 +44,6 @@ func NewDevice(log logr.Logger, name types.NamespacedName, handler DataHandler, 
 }
 
 func (d *device) Configure(spec v1alpha1.BluetoothDeviceSpec, status v1alpha1.BluetoothDeviceStatus) {
-	logrus.Infof("trying to connect to device: %s\n", spec.Name)
 	d.connect(spec, status)
 }
 
@@ -57,7 +55,7 @@ func (d *device) connect(spec v1alpha1.BluetoothDeviceSpec, status v1alpha1.Blue
 
 	var ticker = time.NewTicker(d.syncInterval * time.Second)
 	defer ticker.Stop()
-	logrus.Infof("sync interval is set to %s", d.syncInterval.String())
+	d.log.Info("Sync interval is set to", d.syncInterval.String())
 
 	// run periodically to sync device status
 	for {
@@ -65,6 +63,7 @@ func (d *device) connect(spec v1alpha1.BluetoothDeviceSpec, status v1alpha1.Blue
 			spec:   spec,
 			status: status,
 			done:   make(chan struct{}),
+			log:    d.log,
 		}
 		// Register BLE device handlers.
 		go d.gattDevice.Handle(
@@ -73,11 +72,11 @@ func (d *device) connect(spec v1alpha1.BluetoothDeviceSpec, status v1alpha1.Blue
 			gatt.PeripheralDisconnected(cont.onPeriphDisconnected),
 		)
 
-		d.gattDevice.Init(onStateChanged)
-		logrus.Info("Device Done")
+		d.gattDevice.Init(cont.onStateChanged)
+		d.log.Info("Device Done")
 
 		d.handler(d.name, cont.status)
-		logrus.Infof("Synced ble device status: %+v", cont.status)
+		d.log.Info("Synced ble device status", cont.status)
 		<-cont.done
 
 		select {

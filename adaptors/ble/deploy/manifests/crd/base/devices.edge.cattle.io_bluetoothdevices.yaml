@@ -48,10 +48,6 @@ spec:
           spec:
             description: BluetoothDeviceSpec defines the desired state of BluetoothDevice
             properties:
-              macAddress:
-                type: string
-              name:
-                type: string
               properties:
                 items:
                   description: DeviceProperty defines an individual ble device property
@@ -101,6 +97,14 @@ spec:
                       type: object
                   type: object
                 type: array
+              protocol:
+                description: DeviceProtocol defines how to connect the BLE device
+                properties:
+                  macAddress:
+                    type: string
+                  name:
+                    type: string
+                type: object
             type: object
           status:
             description: BluetoothDeviceStatus defines the observed state of BluetoothDevice

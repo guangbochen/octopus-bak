@@ -50,7 +50,7 @@ type Service struct {
 
 func (s *Service) toJSON(in metav1.Object) []byte {
 	var out = unstructured.Unstructured{Object: make(map[string]interface{})}
-	// NB(thxCode) scheme conversion can keep the typemeta of an object,
+	// NB(thxCode) scheme conversion can keep the typeMeta of an object,
 	// provided that the object type has been registered in scheme first.
 	_ = s.scheme.Convert(in, &out, nil)
 	var bytes, _ = out.MarshalJSON()
@@ -69,7 +69,7 @@ func (s *Service) Connect(server api.Connection_ConnectServer) error {
 		var req, err = server.Recv()
 		if err != nil {
 			if !connection.IsClosed(err) {
-				log.Error(err, "failed to receive connect request from Limb")
+				log.Error(err, "Failed to receive connect request from Limb")
 				return status.Errorf(codes.Unknown, "shutdown connection as receiving error from Limb")
 			}
 			return nil
@@ -95,7 +95,7 @@ func (s *Service) Connect(server api.Connection_ConnectServer) error {
 		// process device
 		if device == nil {
 			var deviceName = object.GetNamespacedName(&bleDevice)
-			log.WithValues("device name", deviceName)
+			log.WithValues("Device name", deviceName)
 			var dataHandler = func(name types.NamespacedName, status v1alpha1.BluetoothDeviceStatus) {
 				// send device by {name, namespace, status} tuple
 				var resp v1alpha1.BluetoothDevice
@@ -109,7 +109,7 @@ func (s *Service) Connect(server api.Connection_ConnectServer) error {
 				// send device
 				if err := server.Send(&api.ConnectResponse{Device: respBytes}); err != nil {
 					if !connection.IsClosed(err) {
-						log.Error(err, "failed to send response to connection")
+						log.Error(err, "Failed to send response to connection")
 					}
 				}
 			}
@@ -118,7 +118,7 @@ func (s *Service) Connect(server api.Connection_ConnectServer) error {
 				log.Error(err, "Failed to open ble device")
 			}
 			device = physical.NewDevice(
-				log.WithValues("device", deviceName),
+				log.WithValues("Device", deviceName),
 				deviceName,
 				dataHandler,
 				parameters,
